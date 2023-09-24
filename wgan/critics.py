@@ -1,32 +1,76 @@
-from torch import nn
+import tensorflow as tf
 
 
-class DeepConvolutionalCritic(nn.Module):
-    def __init__(self):
-        super(DeepConvolutionalCritic, self).__init__()
+class MLPCritic(tf.keras.Model):
+    def __init__(self, hidden_units, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.hidden_layers = [
+            tf.keras.layers.Dense(
+                units,
+                activation="relu",
+            )
+            for units in hidden_units
+        ]
+        self.output_layer = tf.keras.layers.Dense(1)
 
-        self.leaky_relu = nn.LeakyReLU()
+    def call(self, x):
+        hidden = tf.identity(x)
+        for layer in self.hidden_layers:
+            hidden = layer(hidden)
+        return self.output_layer(hidden)
 
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2, padding=1)
-        nn.init.kaiming_normal_(self.conv1.weight)
 
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=1)
-        nn.init.kaiming_normal_(self.conv2.weight)
+class DeepConvCritic(tf.keras.Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, stride=2, padding=1)
-        nn.init.kaiming_normal_(self.conv3.weight)
+        self.leaky_relu = tf.keras.layers.LeakyReLU()
 
-        self.batchnorm1 = nn.BatchNorm2d(128)
-        self.batchnorm2 = nn.BatchNorm2d(256)
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=64,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding="same",
+            kernel_initializer=tf.keras.initializers.HeUniform(),
+        )
 
-        self.flat = nn.Flatten()
-        self.linear = nn.Linear(256 * 2 * 2, 1)
+        self.conv2 = tf.keras.layers.Conv2D(
+            filters=128,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding="same",
+            kernel_initializer=tf.keras.initializers.HeUniform(),
+        )
+        self.batch_norm1 = tf.keras.layers.BatchNormalization()
 
-    def forward(self, x):
-        x = self.leaky_relu(self.conv1(x))
-        x = self.leaky_relu(self.batchnorm1(self.conv2(x)))
-        x = self.leaky_relu(self.batchnorm2(self.conv3(x)))
-        
-        x = self.flat(x)
-        x = self.linear(x)
-        return x
+        self.conv3 = tf.keras.layers.Conv2D(
+            filters=256,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding="same",
+            kernel_initializer=tf.keras.initializers.HeUniform(),
+        )
+        self.batch_norm2 = tf.keras.layers.BatchNormalization()
+
+        self.flatten = tf.keras.layers.Flatten()
+        self.dense = tf.keras.layers.Dense(1)
+
+    def call(self, x):
+        hidden = tf.identity(x)
+
+        # Convolution 1 (64 filters) + LeakyReLU + Dropout
+        hidden = self.conv1(hidden)
+        hidden = self.leaky_relu(hidden)
+
+        # Convolution 2 (128 filters) + LeakyReLU + Dropout
+        hidden = self.conv2(hidden)
+        hidden = self.batch_norm1(hidden)
+        hidden = self.leaky_relu(hidden)
+
+        # Convolution 2 (256 filters) + LeakyReLU + Dropout
+        hidden = self.conv3(hidden)
+        hidden = self.batch_norm2(hidden)
+        hidden = self.leaky_relu(hidden)
+
+        hidden = self.flatten(hidden)
+        return self.dense(hidden)

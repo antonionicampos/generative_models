@@ -1,55 +1,81 @@
-import torch
-
-from torch import nn
+import tensorflow as tf
 
 
-class DeepConvolutionalGenerator(nn.Module):
-    def __init__(self, latent_dim):
-        super(DeepConvolutionalGenerator, self).__init__()
-
-        self.linear = nn.Linear(latent_dim, 4 * 4 * 4 * 64)
-        self.batchnorm = nn.BatchNorm1d(4 * 4 * 4 * 64)
-        self.relu = nn.ReLU()
-
-        self.upsampling1 = nn.ConvTranspose2d(
-            4 * 64,
-            128,
-            kernel_size=5,
-            stride=2,
-            padding=2,
-            bias=False,
+class MLPGenerator(tf.keras.Model):
+    def __init__(self, output_dim, hidden_units, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.hidden_layers = [
+            tf.keras.layers.Dense(units, activation="relu") for units in hidden_units
+        ]
+        self.output_layer = tf.keras.layers.Dense(
+            output_dim, activation="sigmoid", name="output"
         )
-        nn.init.kaiming_normal_(self.upsampling1.weight)
-        self.batchnorm1 = nn.BatchNorm2d(128)
 
-        self.upsampling2 = nn.ConvTranspose2d(
-            128,
-            64,
-            kernel_size=5,
-            stride=2,
-            padding=1,
-            bias=False,
+    def call(self, x):
+        hidden = tf.identity(x)
+        for layer in self.hidden_layers:
+            hidden = layer(hidden)
+        return self.output_layer(hidden)
+
+
+class DeepConvGenerator(tf.keras.Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.dense = tf.keras.layers.Dense(4 * 4 * 4 * 64, use_bias=False)
+
+        self.batch_norm = tf.keras.layers.BatchNormalization()
+        self.relu = tf.keras.layers.ReLU()
+
+        self.reshape_layer = tf.keras.layers.Reshape((4, 4, 4 * 64))
+
+        self.upsampling1 = tf.keras.layers.Conv2DTranspose(
+            filters=128,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding="same",
+            use_bias=False,
+            kernel_initializer=tf.keras.initializers.HeUniform(),
         )
-        nn.init.kaiming_normal_(self.upsampling2.weight)
-        self.batchnorm2 = nn.BatchNorm2d(64)
+        self.batch_norm1 = tf.keras.layers.BatchNormalization()
 
-        self.upsampling3 = nn.ConvTranspose2d(
-            64,
-            1,
-            kernel_size=5,
-            stride=2,
-            padding=1,
-            bias=False,
+        self.upsampling2 = tf.keras.layers.Conv2DTranspose(
+            filters=64,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding="same",
+            use_bias=False,
+            kernel_initializer=tf.keras.initializers.HeUniform(),
         )
-        nn.init.kaiming_normal_(self.upsampling3.weight)
-        self.sigmoid = nn.Sigmoid()
+        self.batch_norm2 = tf.keras.layers.BatchNormalization()
 
-    def forward(self, x):
-        x = self.relu(self.batchnorm(self.linear(x)))
+        self.upsampling3 = tf.keras.layers.Conv2DTranspose(
+            filters=1,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding="same",
+            use_bias=False,
+            kernel_initializer=tf.keras.initializers.HeUniform(),
+            activation="sigmoid",
+        )
 
-        x = x.view(-1, 4 * 64, 4, 4)
+        self.crop2d = tf.keras.layers.Cropping2D(cropping=(2, 2))
 
-        x = self.relu(self.batchnorm1(self.upsampling1(x)))
-        x = self.relu(self.batchnorm2(self.upsampling2(x)))
-        x = self.sigmoid(self.upsampling3(x))
-        return x[..., 2:-1, 2:-1]
+    def call(self, x):
+        hidden = tf.identity(x)
+
+        hidden = self.dense(hidden)
+        hidden = self.batch_norm(hidden)
+        hidden = self.relu(hidden)
+
+        hidden = self.reshape_layer(hidden)
+
+        hidden = self.upsampling1(hidden)
+        hidden = self.batch_norm1(hidden)
+        hidden = self.relu(hidden)
+
+        hidden = self.upsampling2(hidden)
+        hidden = self.batch_norm2(hidden)
+        hidden = self.relu(hidden)
+
+        return self.crop2d(self.upsampling3(hidden))
