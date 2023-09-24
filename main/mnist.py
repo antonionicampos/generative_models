@@ -1,7 +1,7 @@
 import os
 import sys
 
-sys.path.append(os.path.join("..", ".."))
+sys.path.append(os.path.join(".."))
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,18 +15,10 @@ from wgan.generators import DeepConvGenerator
 from wgan.utils import plot_images, CustomHistory
 
 
-print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
+print(f"Available Devices: {tf.config.list_physical_devices()}")
+print(f"Available GPUs: {tf.config.list_physical_devices('GPU')}")
 
 filepath = os.path.join(os.getcwd(), "datasets", "mnist.npz")
-
-# Download and save MNIST data
-# (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data(path=filepath)
-# x_train, y_train, x_test, y_test = (
-#     (x_train[..., np.newaxis] / 255.0).astype("float32"),
-#     y_train,
-#     (x_test[..., np.newaxis] / 255.0).astype("float32"),
-#     y_test,
-# )
 
 # Load MNIST data from .npz file
 data = np.load(filepath)
@@ -68,9 +60,6 @@ else:
     x_train_specialized = x_train[class_indexes, :, :, :]
     dataset = tf.data.Dataset.from_tensor_slices(x_train_specialized).batch(batch_size)
 
-critic = DeepConvCritic()
-generator = DeepConvGenerator()
-
 critic_optimizer = tf.keras.optimizers.Adam(
     learning_rate=alpha,
     beta_1=beta_1,
@@ -81,6 +70,9 @@ generator_optimizer = tf.keras.optimizers.Adam(
     beta_1=beta_1,
     beta_2=beta_2,
 )
+
+critic = DeepConvCritic()
+generator = DeepConvGenerator()
 
 wgan_gp = WGANGP(
     critic=critic,
@@ -116,10 +108,11 @@ batches = neg_critic_loss.shape[0]
 
 fig, ax = plt.subplots(figsize=(10, 4))
 ax.plot(np.arange(batches), neg_critic_loss, alpha=0.4)
-ax.plot(np.arange(batches), pd.Series(neg_critic_loss).rolling(100).mean())
+ax.plot(np.arange(batches), pd.Series(neg_critic_loss).rolling(100, center=True).mean())
 ax.set_xlabel("batch iteration")
 ax.set_ylabel("negative critic loss")
-plt.show()
+
+fig.savefig(os.path.join(os.getcwd(), "images", "training_history.png"), dpi=600)
 
 # # Generate images
 # noise = tf.random.normal([9, latent_dim])

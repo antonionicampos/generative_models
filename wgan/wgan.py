@@ -1,7 +1,6 @@
 import tensorflow as tf
 
-from collections.abc import Callable
-from typing import Dict
+from typing import Callable, Dict
 
 
 class WGAN(tf.keras.Model):
