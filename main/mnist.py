@@ -3,6 +3,12 @@ import sys
 
 sys.path.append(os.path.join(".."))
 
+# 0 = all messages are logged (default behavior)
+# 1 = INFO messages are not printed
+# 2 = INFO and WARNING messages are not printed
+# 3 = INFO, WARNING, and ERROR messages are not printed
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -46,8 +52,8 @@ n_critic = 5
 alpha = 0.0001
 beta_1, beta_2 = 0.5, 0.9
 batch_size = 50
-epochs = 1
-specialized_class = "all"  # 'all' or 0 to 9
+epochs = 10
+specialized_class = 5  # 'all' or 0 to 9
 
 options = ["all"] + [i for i in range(10)]
 assert_msg = f"parâmetro specialized_class aceita somente as opções {options}"
@@ -108,14 +114,15 @@ batches = neg_critic_loss.shape[0]
 
 fig, ax = plt.subplots(figsize=(10, 4))
 ax.plot(np.arange(batches), neg_critic_loss, alpha=0.4)
-ax.plot(np.arange(batches), pd.Series(neg_critic_loss).rolling(100, center=True).mean())
+ax.plot(np.arange(batches), pd.Series(neg_critic_loss).rolling(50, center=True).mean())
 ax.set_xlabel("batch iteration")
 ax.set_ylabel("negative critic loss")
 
 fig.savefig(os.path.join(os.getcwd(), "images", "training_history.png"), dpi=600)
 
-# # Generate images
-# noise = tf.random.normal([9, latent_dim])
-# generated_images = generator(noise, training=False)
+# Generate images
+noise = tf.random.normal([9, latent_dim])
+generated_images = generator(noise, training=False)
 
-# plot_images(generated_images)
+fig = plot_images(generated_images)
+fig.savefig(os.path.join(os.getcwd(), "images", "generated_images.png"), dpi=600)
