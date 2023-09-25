@@ -20,7 +20,7 @@ def plot_images(images):
         ax.imshow(images[i, :, :, 0], cmap="gray")
         ax.axis("off")
     fig.tight_layout(pad=0.4)
-    plt.show()
+    return fig
 
 
 def save_images(images, label, folder):
